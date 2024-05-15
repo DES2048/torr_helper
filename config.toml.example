@@ -1,0 +1,4 @@
+Address = ":7600"
+TarsDir = "tars"
+User = "user"
+Password = "password"
