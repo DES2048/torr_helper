@@ -29,14 +29,16 @@ func NewHttpServer(config *HttpServerConfig) *HttpServer {
 
 	// middewares
 	// basic auth
-	e.Use(middleware.BasicAuth(func(username, password string, ctx echo.Context) (bool, error) {
-		if subtle.ConstantTimeCompare([]byte(username), []byte(config.User)) == 1 &&
-			subtle.ConstantTimeCompare([]byte(password), []byte(config.Password)) == 1 {
-			return true, nil
-		}
+	if config.BasicAuth {
+		e.Use(middleware.BasicAuth(func(username, password string, ctx echo.Context) (bool, error) {
+			if subtle.ConstantTimeCompare([]byte(username), []byte(config.User)) == 1 &&
+				subtle.ConstantTimeCompare([]byte(password), []byte(config.Password)) == 1 {
+				return true, nil
+			}
 
-		return false, nil
-	}))
+			return false, nil
+		}))
+	}
 
 	e.Use(middleware.Logger())
 	// serve tars
@@ -48,6 +50,7 @@ func NewHttpServer(config *HttpServerConfig) *HttpServer {
 
 	// routes
 	apiGroup := e.Group("/api")
+
 	// list tars
 	apiGroup.GET("/tars", func(c echo.Context) error {
 		// get tars list
