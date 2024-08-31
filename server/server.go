@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/subtle"
+	"log"
 	"net/http"
 	"os"
 	"path"
@@ -18,6 +19,7 @@ type NotFoundResponse struct {
 type HttpServer struct {
 	config       *HttpServerConfig
 	echoInstance *echo.Echo
+	sseBroker    *Broker[SseEvent]
 }
 
 func NewHttpServer(config *HttpServerConfig) *HttpServer {
@@ -25,7 +27,10 @@ func NewHttpServer(config *HttpServerConfig) *HttpServer {
 	s := &HttpServer{
 		config:       config,
 		echoInstance: e,
+		sseBroker:    NewBroker[SseEvent](),
 	}
+
+	go s.sseBroker.Start()
 
 	// middewares
 	// basic auth
@@ -72,6 +77,17 @@ func NewHttpServer(config *HttpServerConfig) *HttpServer {
 		return c.JSONPretty(http.StatusOK, resp, "  ")
 	})
 
+	apiGroup.POST("/tars", func(c echo.Context) error {
+		tarName := c.FormValue("name")
+
+		ev := SseEvent{
+			Event: []byte("new-tar"),
+			Data:  []byte(tarName),
+		}
+		s.sseBroker.Pub(ev)
+		return nil
+	})
+
 	// delete tar
 	apiGroup.DELETE("/tars/:name", func(c echo.Context) error {
 		name := c.Param("name")
@@ -91,6 +107,34 @@ func NewHttpServer(config *HttpServerConfig) *HttpServer {
 		}
 
 		return c.NoContent(http.StatusNoContent)
+	})
+
+	// sse
+	e.GET("/sse", func(c echo.Context) error {
+		log.Printf("SSE client connected, ip: %v", c.RealIP())
+
+		eventChan := make(chan SseEvent)
+		s.sseBroker.Subscribe(eventChan)
+
+		w := c.Response()
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+
+		for {
+			select {
+			case <-c.Request().Context().Done():
+				log.Printf("SSE client disconnected, ip: %v", c.RealIP())
+				s.sseBroker.Unubscribe(eventChan)
+				return nil
+			case event := <-eventChan:
+				//log.Printf("New event received: %v", event)
+				if err := event.MarshalTo(w); err != nil {
+					return err
+				}
+				w.Flush()
+			}
+		}
 	})
 
 	// test stub
