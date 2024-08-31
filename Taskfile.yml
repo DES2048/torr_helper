@@ -1,0 +1,46 @@
+version: '3'
+
+env:
+  BIN_NAME: 'torr-helper'
+  BIN_DIR: bin
+  PLATFORM_GOOS:
+    sh: go env GOOS
+  PLATFORM_GOARCH:
+    sh: go env GOARCH
+
+tasks:
+  build:
+    vars:
+      GOARCH: '{{ default .PLATFORM_GOARCH .GOARCH}}' 
+      GOOS: '{{ default .PLATFORM_GOOS .GOOS}}'
+      SUFFIX: '{{default "" .SUFFIX}}'
+    cmds:
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -v -o ${BIN_DIR}/${BIN_NAME}_{{.GOARCH}}{{.SUFFIX}} main.go
+  
+  build-win:
+    cmds:
+      - task: build
+        vars: { SUFFIX: '.exe'}
+        silent: true
+  
+  build-linux2:
+    vars:
+      GOOS: linux
+    cmds:
+      - for: ['amd64', 'arm64']
+        task: build
+        vars: {GOOS: '{{.GOOS}}', GOARCH: '{{.ITEM}}'}
+
+  build-linux:
+    env:
+      GOOS: linux
+    cmds: 
+      - for: ['amd64', 'arm64']
+        cmd: GOARCH={{ .ITEM }} go build -v -o ${BIN_DIR}/${BIN_NAME}_linux_{{ .ITEM }} main.go
+  run:
+    cmds:
+      - go run main.go config.toml
+  
+  env:
+    cmds:
+      - echo $PLATFORM_GOOS
