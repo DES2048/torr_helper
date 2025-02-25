@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/subtle"
+	"echo_sandbox/internal/server/sse"
 	"log"
 	"net/http"
 	"os"
@@ -19,7 +20,7 @@ type NotFoundResponse struct {
 type HttpServer struct {
 	config       *HttpServerConfig
 	echoInstance *echo.Echo
-	sseBroker    *Broker[SseEvent]
+	sseBroker    *sse.Broker[sse.SseEvent]
 }
 
 func NewHttpServer(config *HttpServerConfig) *HttpServer {
@@ -27,7 +28,7 @@ func NewHttpServer(config *HttpServerConfig) *HttpServer {
 	s := &HttpServer{
 		config:       config,
 		echoInstance: e,
-		sseBroker:    NewBroker[SseEvent](),
+		sseBroker:    sse.NewBroker[sse.SseEvent](),
 	}
 
 	go s.sseBroker.Start()
@@ -60,7 +61,6 @@ func NewHttpServer(config *HttpServerConfig) *HttpServer {
 	apiGroup.GET("/tars", func(c echo.Context) error {
 		// get tars list
 		tars, err := filepath.Glob(filepath.Join(config.TarsDir, "*.tar"))
-
 		if err != nil {
 			return err
 		}
@@ -80,7 +80,7 @@ func NewHttpServer(config *HttpServerConfig) *HttpServer {
 	apiGroup.POST("/tars", func(c echo.Context) error {
 		tarName := c.FormValue("name")
 
-		ev := SseEvent{
+		ev := sse.SseEvent{
 			Event: []byte("new-tar"),
 			Data:  []byte(tarName),
 		}
@@ -101,7 +101,6 @@ func NewHttpServer(config *HttpServerConfig) *HttpServer {
 		}
 
 		err = os.Remove(tarpath)
-
 		if err != nil {
 			return err
 		}
@@ -113,7 +112,7 @@ func NewHttpServer(config *HttpServerConfig) *HttpServer {
 	e.GET("/sse", func(c echo.Context) error {
 		log.Printf("SSE client connected, ip: %v", c.RealIP())
 
-		eventChan := make(chan SseEvent)
+		eventChan := make(chan sse.SseEvent)
 		s.sseBroker.Subscribe(eventChan)
 
 		w := c.Response()
@@ -128,7 +127,7 @@ func NewHttpServer(config *HttpServerConfig) *HttpServer {
 				s.sseBroker.Unubscribe(eventChan)
 				return nil
 			case event := <-eventChan:
-				//log.Printf("New event received: %v", event)
+				// log.Printf("New event received: %v", event)
 				if err := event.MarshalTo(w); err != nil {
 					return err
 				}
@@ -147,5 +146,5 @@ func NewHttpServer(config *HttpServerConfig) *HttpServer {
 
 func (s *HttpServer) Start() {
 	s.echoInstance.Logger.Fatal(s.echoInstance.Start(s.config.Address))
-	//return nil
+	// return nil
 }

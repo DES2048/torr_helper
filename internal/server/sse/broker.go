@@ -1,4 +1,4 @@
-package server
+package sse
 
 type Broker[T any] struct {
 	stopCh  chan struct{}
