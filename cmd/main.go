@@ -19,7 +19,7 @@ func RunHelperServer() {
 		log.Fatal(err)
 	}
 
-	s := server.NewHttpServer(config)
+	s := server.NewHttpServer(config.Server)
 	s.Start()
 }
 

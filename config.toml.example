@@ -1,3 +1,4 @@
+[server]
 Address = ":7600"
 TarsDir = "tars"
 BasicAuth = true

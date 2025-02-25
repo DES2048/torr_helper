@@ -6,8 +6,12 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-func ConfigFromToml(filename string) (*server.HttpServerConfig, error) {
-	config := server.DefaultConfig()
+type Config struct {
+	Server *server.HttpServerConfig `yaml:"server"`
+}
+
+func ConfigFromToml(filename string) (*Config, error) {
+	config := &Config{}
 
 	_, err := toml.DecodeFile(filename, config)
 	if err != nil {
