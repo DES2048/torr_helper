@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/subtle"
+	"echo_sandbox/internal/qbt"
 	"echo_sandbox/internal/server/sse"
 	"log"
 	"net/http"
@@ -21,14 +22,16 @@ type HttpServer struct {
 	config       *HttpServerConfig
 	echoInstance *echo.Echo
 	sseBroker    *sse.Broker[sse.SseEvent]
+	qbtClient    qbt.QbtClient
 }
 
-func NewHttpServer(config *HttpServerConfig) *HttpServer {
+func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServer {
 	e := echo.New()
 	s := &HttpServer{
 		config:       config,
 		echoInstance: e,
 		sseBroker:    sse.NewBroker[sse.SseEvent](),
+		qbtClient:    qbtClient,
 	}
 
 	go s.sseBroker.Start()

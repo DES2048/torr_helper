@@ -4,3 +4,7 @@ TarsDir = "tars"
 BasicAuth = true
 User = "user"
 Password = "password"
+[qbt]
+Host = ""
+Username = ""
+Password = ""

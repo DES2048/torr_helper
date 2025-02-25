@@ -2,6 +2,7 @@ package main
 
 import (
 	"echo_sandbox/internal/config"
+	"echo_sandbox/internal/qbt"
 	"echo_sandbox/internal/server"
 	"fmt"
 	"os"
@@ -19,7 +20,10 @@ func RunHelperServer() {
 		log.Fatal(err)
 	}
 
-	s := server.NewHttpServer(config.Server)
+	// create qbt client
+	qbtClient := qbt.NewQbtClientWrapper(config.Qbt)
+
+	s := server.NewHttpServer(config.Server, qbtClient)
 	s.Start()
 }
 

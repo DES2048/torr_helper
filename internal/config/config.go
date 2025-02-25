@@ -1,6 +1,7 @@
 package config
 
 import (
+	"echo_sandbox/internal/qbt"
 	"echo_sandbox/internal/server"
 
 	"github.com/BurntSushi/toml"
@@ -8,6 +9,7 @@ import (
 
 type Config struct {
 	Server *server.HttpServerConfig `yaml:"server"`
+	Qbt    *qbt.QbtClientConfig     `yaml:"qbt"`
 }
 
 func ConfigFromToml(filename string) (*Config, error) {
