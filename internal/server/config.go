@@ -1,7 +1,5 @@
 package server
 
-import "github.com/BurntSushi/toml"
-
 // TODO struct tags
 type HttpServerConfig struct {
 	Address   string
@@ -17,18 +15,4 @@ func DefaultConfig() *HttpServerConfig {
 		BasicAuth: false,
 		TarsDir:   ".",
 	}
-}
-
-func ConfigFromToml(filename string) (*HttpServerConfig, error) {
-	config := DefaultConfig()
-
-	_, err := toml.DecodeFile(filename, config)
-
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO validate config
-
-	return config, nil
 }

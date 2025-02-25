@@ -1,7 +1,8 @@
 package main
 
 import (
-	"echo_sandbox/server"
+	"echo_sandbox/internal/config"
+	"echo_sandbox/internal/server"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,7 +14,7 @@ var configFile string
 
 func RunHelperServer() {
 	// get config
-	config, err := server.ConfigFromToml(configFile)
+	config, err := config.ConfigFromToml(configFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -21,6 +22,7 @@ func RunHelperServer() {
 	s := server.NewHttpServer(config)
 	s.Start()
 }
+
 func main() {
 	// check cmd args
 	if len(os.Args) <= 1 {

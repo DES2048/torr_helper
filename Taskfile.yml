@@ -2,6 +2,7 @@ version: '3'
 
 env:
   BIN_NAME: 'torr-helper'
+  ENTRY: 'cmd/main.go'
   BIN_DIR: bin
   PLATFORM_GOOS:
     sh: go env GOOS
@@ -15,7 +16,7 @@ tasks:
       GOOS: '{{ default .PLATFORM_GOOS .GOOS}}'
       SUFFIX: '{{default "" .SUFFIX}}'
     cmds:
-      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -v -o ${BIN_DIR}/${BIN_NAME}_{{.GOARCH}}{{.SUFFIX}} main.go
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -v -o ${BIN_DIR}/${BIN_NAME}_{{.GOARCH}}{{.SUFFIX}} {{.ENTRY}}
   
   build-win:
     cmds:
@@ -36,10 +37,11 @@ tasks:
       GOOS: linux
     cmds: 
       - for: ['amd64', 'arm64']
-        cmd: GOARCH={{ .ITEM }} go build -v -o ${BIN_DIR}/${BIN_NAME}_linux_{{ .ITEM }} main.go
+        cmd: GOARCH={{ .ITEM }} go build -v -o ${BIN_DIR}/${BIN_NAME}_linux_{{ .ITEM }} {{ .ENTRY}}
+
   run:
     cmds:
-      - go run main.go config.toml
+      - go run {{ .ENTRY }} config.toml
   
   env:
     cmds:
