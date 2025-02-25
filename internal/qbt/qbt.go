@@ -2,6 +2,7 @@ package qbt
 
 import (
 	"context"
+	"echo_sandbox/internal/utils"
 	"errors"
 	"fmt"
 
@@ -10,6 +11,7 @@ import (
 
 type QbtClient interface {
 	LoginCtx(ctx context.Context) error
+	ListTarTorrentsCtx(ctx context.Context) ([]*TorrentInfo, error)
 	DeleteTorrentByNameCtx(ctx context.Context, name string) error
 }
 
@@ -22,6 +24,11 @@ type QbtClientConfig struct {
 	Host     string
 	Username string
 	Password string
+}
+
+type TorrentInfo struct {
+	Name string
+	Hash string
 }
 
 var ErrTorrentNotFound = errors.New("torrent not found")
@@ -43,9 +50,29 @@ func (client *QbtClientWrapper) LoginCtx(ctx context.Context) error {
 	return client.client.LoginCtx(ctx)
 }
 
+func (client *QbtClientWrapper) ListTarTorrentsCtx(ctx context.Context) ([]*TorrentInfo, error) {
+	data, err := client.client.GetTorrentsCtx(ctx, qbittorrent.TorrentFilterOptions{
+		Filter: qbittorrent.TorrentFilterCompleted,
+		Tag:    "tar",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	torrInfo := utils.SliceMap(data, func(i int, t qbittorrent.Torrent) *TorrentInfo {
+		return &TorrentInfo{
+			Name: t.Name,
+			Hash: t.Hash,
+		}
+	})
+
+	return torrInfo, nil
+}
+
 func (client *QbtClientWrapper) DeleteTorrentByNameCtx(ctx context.Context, name string) error {
 	torrents, err := client.client.GetTorrentsCtx(ctx, qbittorrent.TorrentFilterOptions{
-		Tag: "tar",
+		Filter: qbittorrent.TorrentFilterCompleted,
+		Tag:    "tar",
 	})
 	if err != nil {
 		return fmt.Errorf("failed to get torrents list: %w", err)

@@ -1,9 +1,11 @@
 package server
 
 import (
+	"context"
 	"crypto/subtle"
 	"echo_sandbox/internal/qbt"
 	"echo_sandbox/internal/server/sse"
+	"echo_sandbox/internal/utils"
 	"log"
 	"net/http"
 	"os"
@@ -16,6 +18,12 @@ import (
 
 type NotFoundResponse struct {
 	Message string `json:"message"`
+}
+
+type TarsListResp struct {
+	Name string `json:"name"`
+	Size int    `json:"size"`
+	Url  string `json:"url"`
 }
 
 type HttpServer struct {
@@ -68,16 +76,37 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 			return err
 		}
 
-		resp := make([]struct {
-			Name string `json:"name"`
-			Url  string `json:"url"`
-		}, len(tars))
+		ctx := context.Background()
 
-		for idx, tar := range tars {
-			resp[idx].Name = filepath.Base(tar)
-			resp[idx].Url = path.Join("/tars", filepath.Base(tar))
+		// get torrents list
+		err = s.qbtClient.LoginCtx(ctx)
+		// TODO: wrap error
+		if err != nil {
+			return err
 		}
-		return c.JSONPretty(http.StatusOK, resp, "  ")
+
+		torrents, err := s.qbtClient.ListTarTorrentsCtx(ctx)
+		// TODO: wrap error
+		if err != nil {
+			return err
+		}
+
+		// make torrent map
+		torrMap := make(map[string]*qbt.TorrentInfo, len(torrents))
+
+		for _, torr := range torrents {
+			torrMap[torr.Name] = torr
+		}
+
+		torrResp := utils.SliceMap(tars, func(_ int, tar string) TarsListResp {
+			// TODO: stat tars for checking that exists
+			return TarsListResp{
+				Name: filepath.Base(tar),
+				Size: 0,
+				Url:  path.Join("/tars", filepath.Base(tar)),
+			}
+		})
+		return c.JSONPretty(http.StatusOK, torrResp, "  ")
 	})
 
 	apiGroup.POST("/tars", func(c echo.Context) error {
