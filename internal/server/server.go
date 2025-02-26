@@ -20,10 +20,11 @@ type NotFoundResponse struct {
 	Message string `json:"message"`
 }
 
-type TarsListResp struct {
-	Name string `json:"name"`
-	Size int    `json:"size"`
-	Url  string `json:"url"`
+type TorrentsListResp struct {
+	TorrentName string `json:"TorrentName"`
+	TorrentId   string `json:"torrentId"`
+	TarSize     int64  `json:"tarSize"` // indicates whether tarfile exists or not
+	TarUrl      string `json:"tarUrl"`
 }
 
 type HttpServer struct {
@@ -68,18 +69,18 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 	// routes
 	apiGroup := e.Group("/api")
 
-	// list tars
-	apiGroup.GET("/tars", func(c echo.Context) error {
+	// list torrents
+	apiGroup.GET("/torrents", func(c echo.Context) error {
 		// get tars list
-		tars, err := filepath.Glob(filepath.Join(config.TarsDir, "*.tar"))
-		if err != nil {
-			return err
-		}
+		//tars, err := filepath.Glob(filepath.Join(config.TarsDir, "*.tar"))
+		//if err != nil {
+		//	return err
+		//}
 
 		ctx := context.Background()
 
 		// get torrents list
-		err = s.qbtClient.LoginCtx(ctx)
+		err := s.qbtClient.LoginCtx(ctx)
 		// TODO: wrap error
 		if err != nil {
 			return err
@@ -91,20 +92,24 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 			return err
 		}
 
-		// make torrent map
-		torrMap := make(map[string]*qbt.TorrentInfo, len(torrents))
-
-		for _, torr := range torrents {
-			torrMap[torr.Name] = torr
-		}
-
-		torrResp := utils.SliceMap(tars, func(_ int, tar string) TarsListResp {
+		torrResp := utils.SliceMap(torrents, func(_ int, torr *qbt.TorrentInfo) TorrentsListResp {
 			// TODO: stat tars for checking that exists
-			return TarsListResp{
-				Name: filepath.Base(tar),
-				Size: 0,
-				Url:  path.Join("/tars", filepath.Base(tar)),
+			tarPath := filepath.Join(filepath.Dir(torr.ContentPath), filepath.Base(torr.ContentPath), ".tar")
+			stat, err := os.Stat(tarPath)
+
+			resp := TorrentsListResp{
+				TorrentName: torr.Name,
+				TorrentId:   torr.Hash,
 			}
+
+			if err != nil {
+				resp.TarSize = 0
+			} else {
+				resp.TarSize = stat.Size()
+				resp.TarUrl = path.Join("/tars", torr.Hash)
+			}
+
+			return resp
 		})
 		return c.JSONPretty(http.StatusOK, torrResp, "  ")
 	})
@@ -121,8 +126,8 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 	})
 
 	// delete tar
-	apiGroup.DELETE("/tars/:name", func(c echo.Context) error {
-		name := c.Param("name")
+	apiGroup.DELETE("/tars/:id", func(c echo.Context) error {
+		name := c.Param("id")
 
 		// check file exists
 		tarpath := filepath.Join(config.TarsDir, name)

@@ -27,8 +27,9 @@ type QbtClientConfig struct {
 }
 
 type TorrentInfo struct {
-	Name string
-	Hash string
+	Name        string
+	Hash        string
+	ContentPath string
 }
 
 var ErrTorrentNotFound = errors.New("torrent not found")
@@ -61,8 +62,9 @@ func (client *QbtClientWrapper) ListTarTorrentsCtx(ctx context.Context) ([]*Torr
 
 	torrInfo := utils.SliceMap(data, func(i int, t qbittorrent.Torrent) *TorrentInfo {
 		return &TorrentInfo{
-			Name: t.Name,
-			Hash: t.Hash,
+			Name:        t.Name,
+			Hash:        t.Hash,
+			ContentPath: t.ContentPath,
 		}
 	})
 
