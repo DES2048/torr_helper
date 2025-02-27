@@ -23,6 +23,7 @@ type NotFoundResponse struct {
 type TorrentsListResp struct {
 	TorrentName string `json:"TorrentName"`
 	TorrentId   string `json:"torrentId"`
+	TarPath     string `json:"tarPath"`
 	TarSize     int64  `json:"tarSize"` // indicates whether tarfile exists or not
 	TarUrl      string `json:"tarUrl"`
 }
@@ -94,12 +95,13 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 
 		torrResp := utils.SliceMap(torrents, func(_ int, torr *qbt.TorrentInfo) TorrentsListResp {
 			// TODO: stat tars for checking that exists
-			tarPath := filepath.Join(filepath.Dir(torr.ContentPath), filepath.Base(torr.ContentPath), ".tar")
+			tarPath := filepath.Join(filepath.Dir(torr.ContentPath), filepath.Base(torr.ContentPath)+".tar")
 			stat, err := os.Stat(tarPath)
 
 			resp := TorrentsListResp{
 				TorrentName: torr.Name,
 				TorrentId:   torr.Hash,
+				TarPath: tarPath,
 			}
 
 			if err != nil {
