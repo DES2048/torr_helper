@@ -20,12 +20,16 @@ type NotFoundResponse struct {
 	Message string `json:"message"`
 }
 
+type TarInfo struct {
+	Path string `json:"path"`
+	Size int64  `json:"size"`
+	Url  string `json:"url"`
+}
+
 type TorrentsListResp struct {
-	TorrentName string `json:"TorrentName"`
-	TorrentId   string `json:"torrentId"`
-	TarPath     string `json:"tarPath"`
-	TarSize     int64  `json:"tarSize"` // indicates whether tarfile exists or not
-	TarUrl      string `json:"tarUrl"`
+	Name string   `json:"name"`
+	Id   string   `json:"id"`
+	Tar  *TarInfo `json:"tarInfo,omitempty"`
 }
 
 type HttpServer struct {
@@ -72,12 +76,6 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 
 	// list torrents
 	apiGroup.GET("/torrents", func(c echo.Context) error {
-		// get tars list
-		//tars, err := filepath.Glob(filepath.Join(config.TarsDir, "*.tar"))
-		//if err != nil {
-		//	return err
-		//}
-
 		ctx := context.Background()
 
 		// get torrents list
@@ -94,21 +92,23 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 		}
 
 		torrResp := utils.SliceMap(torrents, func(_ int, torr *qbt.TorrentInfo) TorrentsListResp {
-			// TODO: stat tars for checking that exists
+			// stat tars for checking that exists
 			tarPath := filepath.Join(filepath.Dir(torr.ContentPath), filepath.Base(torr.ContentPath)+".tar")
 			stat, err := os.Stat(tarPath)
 
 			resp := TorrentsListResp{
-				TorrentName: torr.Name,
-				TorrentId:   torr.Hash,
-				TarPath: tarPath,
+				Name: torr.Name,
+				Id:   torr.Hash,
 			}
 
-			if err != nil {
-				resp.TarSize = 0
-			} else {
-				resp.TarSize = stat.Size()
-				resp.TarUrl = path.Join("/tars", torr.Hash)
+			if err == nil {
+				tarInfo := &TarInfo{
+					Size: stat.Size(),
+					Url:  path.Join("/tars", torr.Hash),
+					Path: tarPath,
+				}
+				resp.Tar = tarInfo
+
 			}
 
 			return resp
