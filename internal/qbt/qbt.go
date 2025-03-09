@@ -11,8 +11,10 @@ import (
 
 type QbtClient interface {
 	LoginCtx(ctx context.Context) error
-	ListTarTorrentsCtx(ctx context.Context) ([]*TorrentInfo, error)
+	ListTarTorrentsCtx(ctx context.Context, opts *ListTorrentsOptions) ([]*TorrentInfo, error)
+	DeleteTorrentsByHash(ctx context.Context, hashes []string, deleteFiles bool) error
 	DeleteTorrentByNameCtx(ctx context.Context, name string) error
+	GetTorrentCtx(ctx context.Context, hash string) (*TorrentInfo, error)
 }
 
 type QbtClientWrapper struct {
@@ -30,6 +32,11 @@ type TorrentInfo struct {
 	Name        string
 	Hash        string
 	ContentPath string
+}
+
+type ListTorrentsOptions struct {
+	Sort    string
+	Reverse bool
 }
 
 var ErrTorrentNotFound = errors.New("torrent not found")
@@ -51,11 +58,18 @@ func (client *QbtClientWrapper) LoginCtx(ctx context.Context) error {
 	return client.client.LoginCtx(ctx)
 }
 
-func (client *QbtClientWrapper) ListTarTorrentsCtx(ctx context.Context) ([]*TorrentInfo, error) {
-	data, err := client.client.GetTorrentsCtx(ctx, qbittorrent.TorrentFilterOptions{
+func (client *QbtClientWrapper) ListTarTorrentsCtx(ctx context.Context, opts *ListTorrentsOptions) ([]*TorrentInfo, error) {
+	fulterOpts := qbittorrent.TorrentFilterOptions{
 		Filter: qbittorrent.TorrentFilterCompleted,
 		Tag:    "tar",
-	})
+	}
+
+	if opts != nil {
+		fulterOpts.Sort = opts.Sort
+		fulterOpts.Reverse = opts.Reverse
+	}
+
+	data, err := client.client.GetTorrentsCtx(ctx, fulterOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -69,6 +83,29 @@ func (client *QbtClientWrapper) ListTarTorrentsCtx(ctx context.Context) ([]*Torr
 	})
 
 	return torrInfo, nil
+}
+
+func (client *QbtClientWrapper) GetTorrentCtx(ctx context.Context, hash string) (*TorrentInfo, error) {
+	torrs, err := client.client.GetTorrentsCtx(ctx, qbittorrent.TorrentFilterOptions{
+		Hashes: []string{hash},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(torrs) == 0 {
+		return nil, ErrTorrentNotFound
+	}
+
+	return &TorrentInfo{
+		Name:        torrs[0].Name,
+		Hash:        torrs[0].Hash,
+		ContentPath: torrs[0].ContentPath,
+	}, nil
+}
+
+func (client *QbtClientWrapper) DeleteTorrentsByHash(ctx context.Context, hashes []string, deleteFiles bool) error {
+	return client.client.DeleteTorrentsCtx(ctx, hashes, deleteFiles)
 }
 
 func (client *QbtClientWrapper) DeleteTorrentByNameCtx(ctx context.Context, name string) error {
