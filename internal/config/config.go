@@ -4,7 +4,7 @@ import (
 	"echo_sandbox/internal/qbt"
 	"echo_sandbox/internal/server"
 
-	"github.com/BurntSushi/toml"
+	"github.com/ilyakaznacheev/cleanenv"
 )
 
 type Config struct {
@@ -12,15 +12,15 @@ type Config struct {
 	Qbt    *qbt.QbtClientConfig     `yaml:"qbt"`
 }
 
-func ConfigFromToml(filename string) (*Config, error) {
+func ConfigFromFile(filename string) (*Config, error) {
 	config := &Config{}
 
-	_, err := toml.DecodeFile(filename, config)
+	err := cleanenv.ReadConfig(filename, config)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO validate config
+	// TODO: validate config
 
 	return config, nil
 }

@@ -2,11 +2,11 @@ package server
 
 // TODO struct tags
 type HttpServerConfig struct {
-	Address   string
+	Address   string `yaml:"Address"`
 	TarsDir   string
-	BasicAuth bool
-	User      string
-	Password  string
+	BasicAuth bool   `yaml:"BasicAuth"`
+	User      string `yaml:"User"`
+	Password  string `yaml:"Password"`
 }
 
 func DefaultConfig() *HttpServerConfig {

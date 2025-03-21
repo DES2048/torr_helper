@@ -1,0 +1,6 @@
+server:
+  {Address: ":7600", BasicAuth: true,User: user,Password: password}
+qbt:
+  Host: host
+  Username: user
+  Password: password

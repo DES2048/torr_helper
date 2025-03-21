@@ -15,7 +15,7 @@ var configFile string
 
 func RunHelperServer() {
 	// get config
-	config, err := config.ConfigFromToml(configFile)
+	config, err := config.ConfigFromFile(configFile)
 	if err != nil {
 		log.Fatal(err)
 	}

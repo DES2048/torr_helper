@@ -23,9 +23,9 @@ type QbtClientWrapper struct {
 }
 
 type QbtClientConfig struct {
-	Host     string
-	Username string
-	Password string
+	Host     string `yaml:"Host"`
+	Username string `yaml:"Username"`
+	Password string `yaml:"Password"`
 }
 
 type TorrentInfo struct {
