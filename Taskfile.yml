@@ -8,6 +8,7 @@ env:
     sh: go env GOOS
   PLATFORM_GOARCH:
     sh: go env GOARCH
+  DOCKER_IMAGE_TAG: yae-registry.cr.cloud.ru/torr-helper:latest
 
 tasks:
   build:
@@ -39,6 +40,14 @@ tasks:
       - for: ['amd64', 'arm64']
         cmd: GOARCH={{ .ITEM }} go build -v -o ${BIN_DIR}/${BIN_NAME}_linux_{{ .ITEM }} {{ .ENTRY}}
 
+  build-image:
+    cmds:
+      - docker build -t {{.DOCKER_IMAGE_TAG}} .
+  
+  publish-image:
+    deps: [build-image]
+    cmds:
+      - docker push {{.DOCKER_IMAGE_TAG}}
   run:
     cmds:
       - go run {{ .ENTRY }} config.toml

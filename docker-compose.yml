@@ -1,0 +1,25 @@
+services:
+  app:
+    build:
+      context: .
+    container_name: torr-helper
+    configs:
+      - source: app_config
+        target: /app/config.yml
+    volumes:
+      - ~/downloads:/downloads
+    networks:
+      - traefik_net
+    ports:
+      - 127.0.0.1:7600:7600
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.torr-helper.rule=Host(`${TRAEFIK_HOST_RULE}`)"
+      - "traefik.http.services.torr-helper-svc.loadbalancer.server.port=7600"
+networks:
+  traefik_net:
+    external: true
+
+configs:
+  app_config:
+    file: ./config.yml
