@@ -40,7 +40,12 @@ type HttpServer struct {
 }
 
 func getTarPath(torrInfo *qbt.TorrentInfo) string {
-	return filepath.Join(filepath.Dir(torrInfo.ContentPath), filepath.Base(torrInfo.ContentPath)+".tar")
+	lastPath := filepath.Base(torrInfo.ContentPath)
+	// if torrent was renamed tar name should get by torrent name
+	if lastPath != torrInfo.Name {
+		lastPath = torrInfo.Name
+	}
+	return filepath.Join(filepath.Dir(torrInfo.ContentPath), lastPath+".tar")
 }
 
 func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServer {
