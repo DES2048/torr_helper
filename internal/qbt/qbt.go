@@ -5,6 +5,8 @@ import (
 	"echo_sandbox/internal/utils"
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
 
 	"github.com/autobrr/go-qbittorrent"
 )
@@ -32,14 +34,28 @@ type TorrentInfo struct {
 	Name        string
 	Hash        string
 	ContentPath string
+	Size        int64
+	Tags        []string
+	FilesCount  int
 }
 
 type ListTorrentsOptions struct {
-	Sort    string
-	Reverse bool
+	Sort            string
+	Reverse         bool
+	FetchFilesCount bool
 }
 
 var ErrTorrentNotFound = errors.New("torrent not found")
+
+func mapTorrentInfo(t qbittorrent.Torrent) *TorrentInfo {
+	return &TorrentInfo{
+		Name:        t.Name,
+		Hash:        t.Hash,
+		ContentPath: t.ContentPath,
+		Tags:        strings.Split(t.Tags, ", "),
+		Size:        t.Size,
+	}
+}
 
 func NewQbtClientWrapper(config *QbtClientConfig) *QbtClientWrapper {
 	client := qbittorrent.NewClient(qbittorrent.Config{
@@ -59,29 +75,62 @@ func (client *QbtClientWrapper) LoginCtx(ctx context.Context) error {
 }
 
 func (client *QbtClientWrapper) ListTarTorrentsCtx(ctx context.Context, opts *ListTorrentsOptions) ([]*TorrentInfo, error) {
-	fulterOpts := qbittorrent.TorrentFilterOptions{
+	filterOpts := qbittorrent.TorrentFilterOptions{
 		Filter: qbittorrent.TorrentFilterCompleted,
 		Tag:    "tar",
 	}
 
 	if opts != nil {
-		fulterOpts.Sort = opts.Sort
-		fulterOpts.Reverse = opts.Reverse
+		filterOpts.Sort = opts.Sort
+		filterOpts.Reverse = opts.Reverse
 	}
 
-	data, err := client.client.GetTorrentsCtx(ctx, fulterOpts)
+	data, err := client.client.GetTorrentsCtx(ctx, filterOpts)
 	if err != nil {
 		return nil, err
 	}
 
-	torrInfo := utils.SliceMap(data, func(i int, t qbittorrent.Torrent) *TorrentInfo {
-		return &TorrentInfo{
-			Name:        t.Name,
-			Hash:        t.Hash,
-			ContentPath: t.ContentPath,
+	// TODO: fetch files count
+	var filesCountMap sync.Map
+
+	if opts.FetchFilesCount {
+		// for every torrent get its hash
+		var wg sync.WaitGroup
+
+		for _, torr := range data {
+			wg.Add(1)
+			go func(hash string) {
+				files, err := client.client.GetFilesInformationCtx(ctx, hash)
+				if err != nil {
+					return
+				}
+				filesCount := 0
+
+				for _, file := range *files {
+					if file.Progress == 1 {
+						filesCount++
+					}
+				}
+
+				filesCountMap.Store(hash, filesCount)
+				wg.Done()
+			}(torr.Hash)
 		}
+
+		wg.Wait()
+
+	}
+	torrInfo := utils.SliceMap(data, func(i int, t qbittorrent.Torrent) *TorrentInfo {
+		return mapTorrentInfo(t)
 	})
 
+	if opts.FetchFilesCount {
+		for _, torr := range torrInfo {
+			if count, ok := filesCountMap.Load(torr.Hash); ok {
+				torr.FilesCount = count.(int)
+			}
+		}
+	}
 	return torrInfo, nil
 }
 
@@ -97,11 +146,7 @@ func (client *QbtClientWrapper) GetTorrentCtx(ctx context.Context, hash string) 
 		return nil, ErrTorrentNotFound
 	}
 
-	return &TorrentInfo{
-		Name:        torrs[0].Name,
-		Hash:        torrs[0].Hash,
-		ContentPath: torrs[0].ContentPath,
-	}, nil
+	return mapTorrentInfo(torrs[0]), nil
 }
 
 func (client *QbtClientWrapper) DeleteTorrentsByHash(ctx context.Context, hashes []string, deleteFiles bool) error {

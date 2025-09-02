@@ -27,9 +27,12 @@ type TarInfo struct {
 }
 
 type TorrentsListResp struct {
-	Name string   `json:"name"`
-	Id   string   `json:"id"`
-	Tar  *TarInfo `json:"tarInfo,omitempty"`
+	Name       string   `json:"name"`
+	Id         string   `json:"id"`
+	Tar        *TarInfo `json:"tarInfo,omitempty"`
+	Size       int64    `json:"size"`
+	Tags       []string `json:"tags"`
+	FilesCount int      `json:"filesCount"`
 }
 
 type HttpServer struct {
@@ -87,6 +90,9 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 	apiGroup.GET("/torrents", func(c echo.Context) error {
 		ctx := context.Background()
 
+		// get filesCount opts
+		fetchFilesCount := c.QueryParam("filesCount")
+
 		// get torrents list
 		err := s.qbtClient.LoginCtx(ctx)
 		// TODO: wrap error
@@ -97,6 +103,10 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 		listOpts := &qbt.ListTorrentsOptions{
 			Sort:    "completion_on",
 			Reverse: true,
+		}
+
+		if fetchFilesCount == "true" {
+			listOpts.FetchFilesCount = true
 		}
 
 		torrents, err := s.qbtClient.ListTarTorrentsCtx(ctx, listOpts)
@@ -111,8 +121,11 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 			stat, err := os.Stat(tarPath)
 
 			resp := TorrentsListResp{
-				Name: torr.Name,
-				Id:   torr.Hash,
+				Name:       torr.Name,
+				Id:         torr.Hash,
+				Size:       torr.Size,
+				Tags:       torr.Tags,
+				FilesCount: torr.FilesCount,
 			}
 
 			if err == nil {
