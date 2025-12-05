@@ -3,6 +3,7 @@ services:
     build:
       context: .
     container_name: torr-helper
+    restart: unless-stopped
     configs:
       - source: app_config
         target: /app/config.yml
