@@ -1,6 +1,6 @@
 [server]
 Address = ":7600"
-TarsDir = "tars"
+TarsDirs = ["tars", "."]
 BasicAuth = true
 User = "user"
 Password = "password"

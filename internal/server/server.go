@@ -42,13 +42,29 @@ type HttpServer struct {
 	qbtClient    qbt.QbtClient
 }
 
-func getTarPath(torrInfo *qbt.TorrentInfo) string {
+func getTarPath(torrInfo *qbt.TorrentInfo, dirs ...string) (string, error) {
 	lastPath := filepath.Base(torrInfo.ContentPath)
 	// if torrent was renamed tar name should get by torrent name
 	if lastPath != torrInfo.Name {
 		lastPath = torrInfo.Name
 	}
-	return filepath.Join(filepath.Dir(torrInfo.ContentPath), lastPath+".tar")
+
+	if len(dirs) == 0 {
+		dirs = append(dirs, ".")
+	}
+
+	for _, dir := range dirs {
+		parent := dir
+		if dir == "." {
+			parent = filepath.Dir(torrInfo.ContentPath)
+		}
+		tarPath := filepath.Join(parent, lastPath+".tar")
+		if _, err := os.Stat(tarPath); err == nil {
+			return tarPath, nil
+		}
+	}
+
+	return "", os.ErrNotExist
 }
 
 func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServer {
@@ -117,8 +133,8 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 
 		torrResp := utils.SliceMap(torrents, func(_ int, torr *qbt.TorrentInfo) TorrentsListResp {
 			// stat tars for checking that exists
-			tarPath := getTarPath(torr)
-			stat, err := os.Stat(tarPath)
+			tarPath, err := getTarPath(torr, config.TarsDirs...)
+			stat, _ := os.Stat(tarPath)
 
 			resp := TorrentsListResp{
 				Name:       torr.Name,
@@ -173,7 +189,7 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 			return err
 		}
 
-		tarPath := getTarPath(torr)
+		tarPath, _ := getTarPath(torr, config.TarsDirs...)
 
 		err = os.Remove(tarPath)
 		if err != nil {
@@ -192,8 +208,11 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 		if err != nil {
 			return err
 		}
-
-		return c.File(getTarPath(torr))
+		tarPath, err := getTarPath(torr, config.TarsDirs...)
+		if err != nil {
+			return err
+		}
+		return c.File(tarPath)
 	})
 
 	// sse

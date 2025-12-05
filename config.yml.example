@@ -1,5 +1,11 @@
 server:
-  {Address: ":7600", BasicAuth: true,User: user,Password: password}
+  Address: ":7600"
+  BasicAuth: true
+  User: user
+  Password: password
+  TarsDirs:
+    - "."
+    - "tars"
 qbt:
   Host: host
   Username: user
