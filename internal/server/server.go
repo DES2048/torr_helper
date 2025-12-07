@@ -5,12 +5,9 @@ import (
 	"crypto/subtle"
 	"echo_sandbox/internal/qbt"
 	"echo_sandbox/internal/server/sse"
-	"echo_sandbox/internal/utils"
+	"echo_sandbox/internal/utils/tar"
 	"log"
 	"net/http"
-	"os"
-	"path"
-	"path/filepath"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -20,51 +17,11 @@ type NotFoundResponse struct {
 	Message string `json:"message"`
 }
 
-type TarInfo struct {
-	Path string `json:"path"`
-	Size int64  `json:"size"`
-	Url  string `json:"url"`
-}
-
-type TorrentsListResp struct {
-	Name       string   `json:"name"`
-	Id         string   `json:"id"`
-	Tar        *TarInfo `json:"tarInfo,omitempty"`
-	Size       int64    `json:"size"`
-	Tags       []string `json:"tags"`
-	FilesCount int      `json:"filesCount"`
-}
-
 type HttpServer struct {
 	config       *HttpServerConfig
 	echoInstance *echo.Echo
 	sseBroker    *sse.Broker[sse.SseEvent]
 	qbtClient    qbt.QbtClient
-}
-
-func getTarPath(torrInfo *qbt.TorrentInfo, dirs ...string) (string, error) {
-	lastPath := filepath.Base(torrInfo.ContentPath)
-	// if torrent was renamed tar name should get by torrent name
-	if lastPath != torrInfo.Name {
-		lastPath = torrInfo.Name
-	}
-
-	if len(dirs) == 0 {
-		dirs = append(dirs, ".")
-	}
-
-	for _, dir := range dirs {
-		parent := dir
-		if dir == "." {
-			parent = filepath.Dir(torrInfo.ContentPath)
-		}
-		tarPath := filepath.Join(parent, lastPath+".tar")
-		if _, err := os.Stat(tarPath); err == nil {
-			return tarPath, nil
-		}
-	}
-
-	return "", os.ErrNotExist
 }
 
 func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServer {
@@ -92,135 +49,21 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 	}
 
 	e.Use(middleware.Logger())
-	/*/ serve tars
-	staticGroup := e.Group("/tars")
-	staticGroup.Use(middleware.StaticWithConfig(middleware.StaticConfig{
-		Root:   config.TarsDir,
-		Browse: true,
-	})) */
 
 	// routes
 	apiGroup := e.Group("/api")
 
+	apiHandler := NewApiHandler(config, qbtClient)
+
 	// list torrents
-	apiGroup.GET("/torrents", func(c echo.Context) error {
-		ctx := context.Background()
+	apiGroup.GET("/torrents", apiHandler.ListTorrents)
 
-		// get filesCount opts
-		fetchFilesCount := c.QueryParam("filesCount")
+	apiGroup.DELETE("/torrents/:id", apiHandler.DeleteTorrent)
 
-		// get torrents list
-		err := s.qbtClient.LoginCtx(ctx)
-		// TODO: wrap error
-		if err != nil {
-			return err
-		}
-
-		listOpts := &qbt.ListTorrentsOptions{
-			Sort:    "completion_on",
-			Reverse: true,
-		}
-
-		if fetchFilesCount == "true" {
-			listOpts.FetchFilesCount = true
-		}
-
-		torrents, err := s.qbtClient.ListTarTorrentsCtx(ctx, listOpts)
-		// TODO: wrap error
-		if err != nil {
-			return err
-		}
-
-		torrResp := utils.SliceMap(torrents, func(_ int, torr *qbt.TorrentInfo) TorrentsListResp {
-			// stat tars for checking that exists
-			tarPath, err := getTarPath(torr, config.TarsDirs...)
-			stat, _ := os.Stat(tarPath)
-
-			resp := TorrentsListResp{
-				Name:       torr.Name,
-				Id:         torr.Hash,
-				Size:       torr.Size,
-				Tags:       torr.Tags,
-				FilesCount: torr.FilesCount,
-			}
-
-			if err == nil {
-				tarInfo := &TarInfo{
-					Size: stat.Size(),
-					Url:  path.Join("/tars", torr.Hash),
-					Path: tarPath,
-				}
-				resp.Tar = tarInfo
-
-			}
-
-			return resp
-		})
-		return c.JSONPretty(http.StatusOK, torrResp, "  ")
-	})
-
-	apiGroup.DELETE("/torrents/:id", func(c echo.Context) error {
-		torrHash := c.Param("id")
-		err := s.qbtClient.DeleteTorrentsByHash(context.Background(), []string{torrHash}, true)
-		if err != nil {
-			return err
-		}
-
-		return c.NoContent(204)
-	})
-
-	apiGroup.POST("/make-tar/:id", func(c echo.Context) error {
-		id := c.Param("id")
-		// TODO: get torrent
-		torr, err := s.qbtClient.GetTorrentCtx(context.Background(), id)
-		if err != nil {
-			return err
-		}
-
-		// make tar
-
-		lastPath := filepath.Base(torr.ContentPath)
-		// if torrent was renamed tar name should get by torrent name
-		if lastPath != torr.Name {
-			lastPath = torr.Name
-		}
-
-		// Write File or directory to a tar file.
-		tarPath := filepath.Join(config.TarCreateDir, lastPath+".tar")
-
-		go utils.CreateTar(tarPath, torr.ContentPath, filepath.Base(torr.ContentPath))
-		return c.NoContent(http.StatusNoContent)
-	})
-
-	apiGroup.POST("/tars", func(c echo.Context) error {
-		tarName := c.FormValue("name")
-
-		ev := sse.SseEvent{
-			Event: []byte("new-tar"),
-			Data:  []byte(tarName),
-		}
-		s.sseBroker.Pub(ev)
-		return nil
-	})
+	apiGroup.POST("/make-tar/:id", apiHandler.MakeTar)
 
 	// delete tar
-	apiGroup.DELETE("/tars/:id", func(c echo.Context) error {
-		id := c.Param("id")
-		// TODO: get torrent
-		torr, err := s.qbtClient.GetTorrentCtx(context.Background(), id)
-		if err != nil {
-			return err
-		}
-
-		tarPath, _ := getTarPath(torr, config.TarsDirs...)
-
-		err = os.Remove(tarPath)
-		if err != nil {
-			return err
-		}
-
-		return c.NoContent(http.StatusNoContent)
-	})
+	apiGroup.DELETE("/tars/:id", apiHandler.DeleteTar)
 
 	// download tar
 	e.GET("/tars/:id", func(c echo.Context) error {
@@ -231,7 +74,7 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 		if err != nil {
 			return err
 		}
-		tarPath, err := getTarPath(torr, config.TarsDirs...)
+		tarPath, err := tar.GetTarPath(torr, config.TarsDirs...)
 		if err != nil {
 			return err
 		}
@@ -264,6 +107,17 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 				w.Flush()
 			}
 		}
+	})
+
+	apiGroup.POST("/tars", func(c echo.Context) error {
+		tarName := c.FormValue("name")
+
+		ev := sse.SseEvent{
+			Event: []byte("new-tar"),
+			Data:  []byte(tarName),
+		}
+		s.sseBroker.Pub(ev)
+		return nil
 	})
 
 	// test stub

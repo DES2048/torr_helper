@@ -1,11 +1,38 @@
-package utils
+package tar
 
 import (
 	"archive/tar"
+	"echo_sandbox/internal/qbt"
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 )
+
+func GetTarPath(torrInfo *qbt.TorrentInfo, dirs ...string) (string, error) {
+	lastPath := filepath.Base(torrInfo.ContentPath)
+	// if torrent was renamed tar name should get by torrent name
+	if lastPath != torrInfo.Name {
+		lastPath = torrInfo.Name
+	}
+
+	if len(dirs) == 0 {
+		dirs = append(dirs, ".")
+	}
+
+	for _, dir := range dirs {
+		parent := dir
+		if dir == "." {
+			parent = filepath.Dir(torrInfo.ContentPath)
+		}
+		tarPath := filepath.Join(parent, lastPath+".tar")
+		if _, err := os.Stat(tarPath); err == nil {
+			return tarPath, nil
+		}
+	}
+
+	return "", os.ErrNotExist
+}
 
 func CreateTar(tarPath string, path string, arcname string) error {
 	tarFile, err := os.Create(tarPath)
@@ -15,11 +42,11 @@ func CreateTar(tarPath string, path string, arcname string) error {
 	defer tarFile.Close()
 	tw := tar.NewWriter(tarFile)
 	defer tw.Close()
-	TraverseDirectory(path, arcname, tw)
+	traverseDirectory(path, arcname, tw)
 	return nil
 }
 
-func WriteToTar(path string, arcpath string, tw *tar.Writer, fi os.FileInfo) {
+func writeToTar(path string, arcpath string, tw *tar.Writer, fi os.FileInfo) {
 	// Open the path
 	fr, _ := os.Open(path)
 	defer fr.Close()
@@ -45,7 +72,7 @@ func WriteToTar(path string, arcpath string, tw *tar.Writer, fi os.FileInfo) {
 // Move inside each directory and write info to tar
 // dirPath : folder which you want to tar it.
 // tw      : its tarFile writer to your tar file.
-func TraverseDirectory(dirPath string, arcpath string, tw *tar.Writer) {
+func traverseDirectory(dirPath string, arcpath string, tw *tar.Writer) {
 	// Open the directory
 	dir, err := os.Open(dirPath)
 	if err != nil {
@@ -62,9 +89,9 @@ func TraverseDirectory(dirPath string, arcpath string, tw *tar.Writer) {
 	for _, fi := range fis {
 		curPath := dirPath + "/" + fi.Name()
 
-		WriteToTar(curPath, arcpath+"/"+fi.Name(), tw, fi)
+		writeToTar(curPath, arcpath+"/"+fi.Name(), tw, fi)
 		if fi.IsDir() {
-			TraverseDirectory(curPath, arcpath+"/"+fi.Name(), tw)
+			traverseDirectory(curPath, arcpath+"/"+fi.Name(), tw)
 		}
 	}
 }
