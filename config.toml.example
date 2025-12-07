@@ -1,5 +1,6 @@
 [server]
 Address = ":7600"
+TarCreateDir = "/downloads/_tars"
 TarsDirs = ["tars", "."]
 BasicAuth = true
 User = "user"

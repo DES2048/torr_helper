@@ -169,6 +169,29 @@ func NewHttpServer(config *HttpServerConfig, qbtClient qbt.QbtClient) *HttpServe
 		return c.NoContent(204)
 	})
 
+	apiGroup.POST("/make-tar/:id", func(c echo.Context) error {
+		id := c.Param("id")
+		// TODO: get torrent
+		torr, err := s.qbtClient.GetTorrentCtx(context.Background(), id)
+		if err != nil {
+			return err
+		}
+
+		// make tar
+
+		lastPath := filepath.Base(torr.ContentPath)
+		// if torrent was renamed tar name should get by torrent name
+		if lastPath != torr.Name {
+			lastPath = torr.Name
+		}
+
+		// Write File or directory to a tar file.
+		tarPath := filepath.Join(config.TarCreateDir, lastPath+".tar")
+
+		go utils.CreateTar(tarPath, torr.ContentPath, filepath.Base(torr.ContentPath))
+		return c.NoContent(http.StatusNoContent)
+	})
+
 	apiGroup.POST("/tars", func(c echo.Context) error {
 		tarName := c.FormValue("name")
 

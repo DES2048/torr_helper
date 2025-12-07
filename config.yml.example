@@ -3,6 +3,7 @@ server:
   BasicAuth: true
   User: user
   Password: password
+  TarCreateDir: "/downloads/_tars"
   TarsDirs:
     - "."
     - "tars"
